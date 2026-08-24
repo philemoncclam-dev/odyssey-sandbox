@@ -1,0 +1,18 @@
+{
+  // Tests get every check the source gets, with one exception.
+  //
+  // `noUncheckedIndexedAccess` earns its keep in source, where an index that
+  // misses is a bug reaching production. In a test it is noise: the test
+  // builds the fixture two lines above, so `rows[0]` cannot miss — and if it
+  // somehow did, the test fails loudly, which is the whole job. Adding 145
+  // non-null assertions to say so would teach reviewers to skim past `!`,
+  // which is exactly the habit the flag exists to prevent.
+  //
+  // Turned off here rather than repo-wide so source keeps the guarantee.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["src"],
+  "exclude": []
+}

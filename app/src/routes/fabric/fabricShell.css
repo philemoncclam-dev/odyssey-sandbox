@@ -1,0 +1,23 @@
+/* Fabric Toolkit shell: the page frame and the tab strip in its top bar.
+   The bar itself is shell/pageHeader.css — shared with the Model Browser. */
+
+.fxs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-canvas);
+  color: var(--color-text-primary);
+  overflow: hidden;
+}
+
+.fxs-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* No tab styles here on purpose — the toolkit's sections are the shell's left
+   rail (see shell/railConfig.ts), not a strip under the title. */
+

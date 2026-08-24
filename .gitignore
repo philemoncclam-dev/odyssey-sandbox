@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venv312/
+
+# Node / Vite
+app/node_modules/
+app/dist/
+
+# Local run artifacts
+*.log
+.env
+app/.env
+
+# OS
+.DS_Store
+Thumbs.db

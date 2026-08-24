@@ -1,0 +1,86 @@
+.ob-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.35);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+}
+
+.ob-dialog {
+  position: relative;
+  width: min(380px, calc(100vw - 32px));
+  padding: var(--spacing-6) var(--spacing-6) var(--spacing-4);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-overlay);
+  text-align: center;
+}
+
+.ob-x {
+  position: absolute;
+  top: var(--spacing-2);
+  right: var(--spacing-2);
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+.ob-x:hover {
+  color: var(--color-text-primary);
+}
+
+.ob-title {
+  margin: 0 0 var(--spacing-2);
+  font-size: var(--text-heading);
+  color: var(--color-text-primary);
+}
+
+.ob-body {
+  margin: 0 0 var(--spacing-4);
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+.ob-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: var(--spacing-4);
+}
+.ob-dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-border-strong);
+  cursor: pointer;
+}
+.ob-dot[data-active] {
+  background: var(--color-accent);
+}
+
+.ob-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-2);
+}
+.ob-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-1);
+  color: var(--color-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.ob-btn.primary {
+  background: var(--color-accent);
+  border-color: transparent;
+  color: white;
+}

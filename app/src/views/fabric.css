@@ -1,0 +1,2623 @@
+/* Fabric-toolkit explorer. Token-driven, dark-first like the rest of the
+   shell. Master-detail: a disclosure tree (left) drives a contextual detail
+   panel (right). The tree is a flat stack of disclosure rows indented by depth
+   rather than nested <ul>s, so every row shares one hover/height rhythm. */
+
+/* Full-bleed page: the explorer takes the whole content region rather than a
+   centred card. A capped card left a wide screen with margins on both sides
+   while the middle column — the one holding code, schemas and the sandbox
+   canvas — was the thing being starved. The gutter is now padding, not
+   emptiness beside a max-width. */
+.fx-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-4);
+  overflow: hidden;
+}
+/* Three columns on Explore: tree | detail | sandbox sequence. Only the middle
+   one is elastic: the tree and the sequence are lists of short rows and get no
+   more readable past ~320px, so every extra pixel of screen goes to the detail.
+   They do widen a little on very large screens (see below) to stop the ratio
+   looking accidental. */
+.fx-explorer {
+  --fx-head-h: 40px;
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(260px, 320px);
+  width: 100%;
+  min-height: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-1, var(--color-surface-canvas));
+  overflow: hidden;
+}
+.fx-explorer--single {
+  grid-template-columns: 1fr;
+  place-items: center;
+  padding: var(--spacing-8);
+}
+
+.fx-explorer-tree {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--color-border);
+}
+.fx-explorer-detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Details | Sandbox — the detail column's two faces. The sandbox has no route
+   of its own; its canvas and report render in this column. */
+/* Height is shared with .fx-panel-head, not left to the content: these are the
+   top row of three side-by-side columns and any difference reads as one panel
+   sitting slightly lower than its neighbours. The tabs stretch to fill it so
+   the active underline lands exactly on the same 1px line the other two heads
+   close with. */
+.fx-detail-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  height: var(--fx-head-h, 40px);
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+.fx-detail-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--color-text-tertiary);
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  cursor: pointer;
+}
+.fx-detail-tab:hover {
+  color: var(--color-text-primary);
+}
+.fx-detail-tab[data-active] {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-accent);
+}
+.fx-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-surface-canvas);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.fx-detail-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+/* The docked sandbox sequence builder (Explore's third column). */
+.fx-explorer-seq {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+}
+/* Very wide screens: the side columns take a little more, so the layout looks
+   proportioned rather than like two thin strips beside an ocean. */
+@media (min-width: 1800px) {
+  .fx-explorer:not(.fx-explorer--single) {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) minmax(320px, 400px);
+  }
+}
+/* Narrow screens: the sequence drops below rather than squeezing the detail. */
+@media (max-width: 1180px) {
+  .fx-explorer:not(.fx-explorer--single) {
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  }
+  .fx-explorer-seq {
+    grid-column: 1 / -1;
+    max-height: 40vh;
+    border-left: 0;
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+.fx-panel-head--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fx-panel-clear {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-text-tertiary);
+  font: inherit;
+  font-size: var(--text-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.fx-panel-clear:hover:not(:disabled) {
+  color: var(--color-destructive);
+}
+.fx-panel-clear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* The ▶ glyph inline in the empty-state sentence, so the affordance being
+   described is recognisable before it has ever been hovered. */
+.fx-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-accent);
+  font-size: 9px;
+  vertical-align: -3px;
+}
+
+.fx-panel-head {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  height: var(--fx-head-h, 40px);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.fx-tree {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.fx-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--row-height);
+  border-radius: var(--radius-control);
+}
+.fx-row:hover {
+  background: var(--color-surface-2, rgba(255, 255, 255, 0.04));
+}
+.fx-row[data-selected] {
+  background: color-mix(in oklab, var(--color-accent) 16%, transparent);
+}
+.fx-row[data-selected] .fx-label {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.fx-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.fx-row-main:disabled {
+  cursor: default;
+}
+
+/* Chevron is its own control so expanding/collapsing is separate from
+   selecting — selecting a branch must never collapse it. */
+.fx-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-control);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+.fx-toggle:hover {
+  background: var(--color-surface-canvas, rgba(255, 255, 255, 0.06));
+  color: var(--color-text-primary);
+}
+.fx-toggle-spacer {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+}
+
+/* "Open in Fabric" — quiet until the row is hovered or the link is focused. */
+.fx-open {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-right: 4px;
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-control);
+  opacity: 0;
+  transition: opacity 100ms ease, color 100ms ease, background 100ms ease;
+}
+.fx-row:hover .fx-open,
+.fx-open:focus-visible {
+  opacity: 1;
+}
+.fx-open:hover {
+  color: var(--color-accent);
+  background: var(--color-surface-canvas, rgba(255, 255, 255, 0.06));
+}
+.fx-open svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Add-to-sequence, on the tree row beside Open-in-Fabric. It is the ONLY way
+   to add a step — the sequence panel has no picker of its own — so unlike the
+   Fabric link it stays visible once the item is in the sequence, carrying the
+   count as its own receipt. */
+.fx-add {
+  gap: 3px;
+}
+.fx-add[data-queued] {
+  opacity: 1;
+  width: auto;
+  padding: 0 5px;
+  color: var(--color-accent);
+}
+.fx-add-n {
+  min-width: 13px;
+  padding: 0 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-surface-canvas);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+}
+
+.fx-chevron {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-tertiary);
+  transition: transform 120ms ease;
+}
+.fx-row[data-open='true'] .fx-chevron {
+  transform: rotate(90deg);
+}
+.fx-chevron.fx-hidden {
+  visibility: hidden;
+}
+
+.fx-icon {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  color: var(--color-text-secondary);
+}
+.fx-icon[data-kind='lakehouse'] {
+  color: var(--color-accent);
+}
+.fx-icon[data-kind='notebook'] {
+  color: var(--color-domain-notebook, var(--color-text-secondary));
+}
+
+.fx-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fx-meta {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  font-family: var(--font-mono);
+}
+
+.fx-note {
+  padding: 4px 8px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+}
+.fx-note[data-error='true'] {
+  color: var(--color-destructive);
+}
+
+.fx-empty {
+  padding: 8px;
+  color: var(--color-text-secondary);
+}
+
+/* --- detail panel ------------------------------------------------------- */
+.fx-detail-empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+.fx-detail-empty .fx-icon {
+  width: 28px;
+  height: 28px;
+  opacity: 0.5;
+}
+.fx-detail-empty p {
+  max-width: 32ch;
+  margin: 0;
+}
+
+.fx-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px;
+  min-height: 0;
+}
+.fx-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fx-detail-head .fx-icon {
+  width: 22px;
+  height: 22px;
+}
+.fx-detail-titles {
+  min-width: 0;
+}
+.fx-detail-title {
+  margin: 0;
+  font-size: var(--text-lg, 18px);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fx-detail-sub {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+
+/* Groups "copy link" and "open in Fabric" so they sit flush together at the
+   right of the title row — one `margin-left: auto` on the group, not one on
+   each button. Two auto margins in the same flex row each claim their own
+   share of the leftover space, which was pushing the pair apart from each
+   other as well as from the title. */
+.fx-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex: none;
+}
+
+/* Discrete "open in Fabric" / "copy link" in the detail header — always
+   visible (unlike the hover-gated tree variant). */
+.fx-open--detail {
+  opacity: 1;
+  border: 1px solid var(--color-border);
+}
+.fx-open--detail:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.fx-detail-desc {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm, 13px);
+  line-height: 1.5;
+}
+
+.fx-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+.fx-btn:hover {
+  border-color: var(--color-accent);
+  background: var(--color-surface-canvas, rgba(255, 255, 255, 0.06));
+}
+.fx-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.fx-btn--primary {
+  background: var(--color-accent);
+  color: var(--color-surface-canvas);
+  border-color: transparent;
+  font-weight: 600;
+}
+.fx-btn--primary:hover {
+  background: color-mix(in oklab, var(--color-accent) 88%, white);
+  border-color: transparent;
+}
+
+/* key/value metadata list */
+.fx-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.fx-kv-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--color-surface-2);
+}
+.fx-kv-row dt {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm, 13px);
+}
+.fx-kv-row dd {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm, 13px);
+  overflow-wrap: anywhere;
+}
+.fx-kv code,
+.fx-detail-body code {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+
+/* column list */
+.fx-cols {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm, 13px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.fx-cols th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--color-border);
+}
+.fx-cols td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+.fx-cols tr:last-child td {
+  border-bottom: none;
+}
+.fx-cols-type {
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  font-size: var(--text-micro);
+}
+
+/* Pipeline sequence — the sandbox Sequence view's reading, applied to a
+   pipeline's own order of events. Deliberately the same palette and card
+   metrics as `.sbx-flow-*`: the two views answer the same question about
+   different things, and looking alike is the point.
+
+   (`--color-surface-canvas` and `--color-grid-dot` were never defined, so this
+   canvas had been falling back to a dark tint left over from the superseded
+   dark direction — visible as a grey box in a light app.) */
+.fx-pipe {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: #fff;
+  overflow: auto;
+  max-height: calc(100vh - 360px);
+}
+.fx-pipe-canvas {
+  position: relative;
+  background-image: radial-gradient(rgb(28 35 51 / 0.09) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.fx-pipe-edges {
+  position: absolute;
+  inset: 0;
+  color: rgb(28 35 51 / 0.32);
+  pointer-events: none;
+}
+.fx-pipe-edge {
+  stroke: currentColor;
+  stroke-width: 1.25;
+}
+/* A read and a write both run left-to-right here (see the note in the layout),
+   so the tint is what distinguishes them at a glance. */
+.fx-pipe-edge[data-tone='read'] {
+  color: #4a72b8;
+}
+.fx-pipe-edge[data-tone='write'] {
+  color: #3f8f66;
+}
+
+.fx-seq-caption {
+  margin: 0 0 8px;
+  color: #6b7385;
+  font-size: var(--text-micro);
+}
+
+.fx-seq-card {
+  position: absolute;
+  background: #fff;
+  border: 1px solid rgb(28 35 51 / 0.28);
+  box-shadow: 0 1px 2px rgb(28 35 51 / 0.05);
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1;
+}
+.fx-seq-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 6px;
+  border-bottom: 1px solid rgb(28 35 51 / 0.14);
+}
+/* A card with no rows carries no divider — there is nothing under it. */
+.fx-seq-card > .fx-seq-head:last-child {
+  border-bottom: none;
+}
+.fx-seq-table .fx-seq-head {
+  background: #f2f5fa;
+}
+.fx-seq-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 2px;
+  background: #e8f0fe;
+  color: #12305e;
+  font-size: 10px;
+  font-weight: 600;
+}
+/* Two activities sharing a number start together, so the badge is not a unique
+   position in a line. Ringed rather than recoloured: it is the same step. */
+.fx-seq-num[data-concurrent] {
+  box-shadow: 0 0 0 1px #7ea3d8;
+}
+.fx-seq-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1c2333;
+}
+.fx-seq-type {
+  flex: none;
+  color: #6b7385;
+  font-size: 11px;
+}
+.fx-seq-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 0 8px;
+  white-space: nowrap;
+}
+.fx-seq-row:hover {
+  background: #eef2f7;
+}
+.fx-seq-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #4a5163;
+  font-size: 11px;
+}
+.fx-seq-tag {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+}
+.fx-seq-tag[data-tone='read'] {
+  background: #e2ebfa;
+  color: #1c447f;
+}
+.fx-seq-tag[data-tone='write'] {
+  background: #d3f0e0;
+  color: #114a2b;
+}
+
+/* code viewer — a gutter of line numbers beside a mono <pre>. */
+.fx-code {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-canvas, rgba(0, 0, 0, 0.25));
+  overflow: auto;
+  max-height: calc(100vh - 320px);
+}
+.fx-code-gutter {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px;
+  text-align: right;
+  color: var(--color-text-tertiary);
+  border-right: 1px solid var(--color-border);
+  user-select: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1.6;
+}
+.fx-code-body {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  white-space: pre;
+}
+
+/* --- notebook sandbox (sequence builder) -------------------------------- */
+/* The sandbox has no page of its own: the builder is Explore's third column
+   and this canvas body renders in its detail column's Sandbox tab. */
+/* Toolbar above the lineage: what this is, and the handover to Modeling. */
+.sbx-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+/* Flow | Sequence — a segmented control, because the two are alternative
+   arrangements of one graph rather than two independent toggles. */
+.sbx-views {
+  flex: 0 0 auto;
+  display: flex;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-2);
+}
+.sbx-view {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--color-text-tertiary);
+  font: inherit;
+  font-size: var(--text-micro);
+  font-weight: 600;
+  cursor: pointer;
+}
+.sbx-view:hover {
+  color: var(--color-text-primary);
+}
+.sbx-view[data-active] {
+  background: var(--color-accent);
+  color: var(--color-surface-canvas);
+}
+.sbx-bar-title {
+  flex: 1 1 auto;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.sbx-canvas-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sbx-steps {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sbx-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-2);
+}
+.sbx-step[data-status='error'] {
+  border-color: var(--color-destructive);
+}
+.sbx-step-num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-surface-canvas);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.sbx-step-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm, 13px);
+}
+.sbx-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.sbx-step-dot[data-ok] {
+  background: var(--color-success);
+}
+.sbx-step-dot[data-err] {
+  background: var(--color-destructive);
+}
+.sbx-step-ctrls {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.sbx-step-ctrls button {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.sbx-step-ctrls button:hover:not(:disabled) {
+  background: var(--color-surface-canvas, rgba(255, 255, 255, 0.06));
+  color: var(--color-text-primary);
+}
+.sbx-step-ctrls button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.sbx-add {
+  justify-content: center;
+  width: 100%;
+}
+
+.sbx-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-canvas, rgba(0, 0, 0, 0.2));
+}
+.sbx-picker-input {
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-1);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+}
+.sbx-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 280px;
+  overflow: auto;
+}
+.sbx-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sbx-picker-row:hover {
+  background: var(--color-surface-2, rgba(255, 255, 255, 0.04));
+}
+.sbx-picker-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm, 13px);
+}
+.sbx-picker-ws {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+}
+.sbx-picker-close {
+  align-self: flex-end;
+}
+
+.sbx-run-bar {
+  flex: 0 0 auto;
+  padding: 12px;
+  border-top: 1px solid var(--color-border);
+}
+.sbx-run-bar .fx-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* per-step run report */
+.sbx-step-report {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-1);
+}
+.sbx-step-report[data-status='error'] {
+  border-color: var(--color-destructive);
+}
+.sbx-step-report-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sbx-step-report-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.sbx-step-report-note {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+}
+
+/* Status as a pill, so ok/error is legible at a glance instead of grey
+   uppercase text that reads the same either way. */
+.sbx-status-pill {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.sbx-status-pill[data-status='ok'] {
+  border-color: color-mix(in oklab, var(--color-success) 45%, transparent);
+  color: var(--color-success);
+}
+.sbx-status-pill[data-status='error'] {
+  border-color: color-mix(in oklab, var(--color-destructive) 45%, transparent);
+  color: var(--color-destructive);
+}
+
+/* ---------------------------------------------------------------------------
+   Sandbox lineage canvas — drawn in the Modeling canvas idiom (see
+   modeling/modeling.css): a sticky layer band over columns of square white
+   object cards, each a header plus attribute rows. Palette is the same
+   hard-coded light one Modeling uses, so the two canvases read as one surface.
+--------------------------------------------------------------------------- */
+.sbx-flow {
+  border: 1px solid rgb(28 35 51 / 0.18);
+  background: #fbfbfc;
+  overflow: auto;
+  min-height: 240px;
+}
+.sbx-flow-world {
+  position: relative;
+  min-width: 100%;
+}
+
+/* the layer band — sticky on `top` only; never add `left` (it re-creates the
+   horizontal drift documented in the handoff) */
+.sbx-flow-band {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fbfbfc;
+  border-bottom: 1px solid rgb(28 35 51 / 0.22);
+}
+.sbx-flow-layer {
+  position: absolute;
+  top: 0;
+  border-left: 1px solid rgb(28 35 51 / 0.14);
+  color: #3d4557;
+  font-size: 12px;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sbx-flow-layer:first-child {
+  border-left: 0;
+}
+.sbx-flow-layer-center {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+  transform: translateX(-50%);
+}
+.sbx-flow-layer-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 6px;
+}
+
+.sbx-flow-canvas {
+  position: relative;
+  background-image: radial-gradient(rgb(28 35 51 / 0.09) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.sbx-flow-edges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.sbx-flow-edge {
+  stroke: #98a0b0;
+  color: #98a0b0;
+}
+.sbx-flow-edge[data-tone='read'] {
+  stroke: #4a76c4;
+  color: #4a76c4;
+}
+.sbx-flow-edge[data-tone='write'] {
+  stroke: #168f5c;
+  color: #168f5c;
+}
+.sbx-flow-edge[data-dashed] {
+  stroke: #c2c8d2;
+  color: #c2c8d2;
+}
+/* A write looping back into the tables column (sequence view). Slightly
+   lighter than a forward edge so the left-to-right reads stay the dominant
+   direction and the return trips read as returns. */
+.sbx-flow-edge[data-backward] {
+  stroke-opacity: 0.75;
+}
+/* Column-to-column edges. One access draws as many of these as the table has
+   columns, so they have to sit UNDER the reading of the graph rather than
+   become it: thin, faded, and no arrowhead — the direction is already carried
+   by the colour and by the row the line leaves. Opacity rather than
+   stroke-opacity so the marker fades with the stroke.
+
+   `vector-effect` keeps them hairline-thin whatever the canvas is scaled to;
+   at 0.5px they would otherwise disappear entirely on a zoomed-out view. */
+.sbx-flow-edge[data-kind='column'] {
+  opacity: 0.4;
+  stroke-width: 0.9;
+  vector-effect: non-scaling-stroke;
+  marker-end: none;
+}
+/* A column row nested under an access inside a step card — the same schema the
+   table card shows, repeated where the access is. Set back from the table row
+   above it so the group reads as belonging to that access and not as more
+   accesses. */
+.sbx-flow-card:not([data-kind='table']) .sbx-flow-row[data-tone='col'] {
+  color: #5b6478;
+  background: rgb(28 35 51 / 0.015);
+}
+
+.sbx-flow-card {
+  position: absolute;
+  background: #fff;
+  border: 1px solid rgb(28 35 51 / 0.28);
+  box-shadow: 0 1px 2px rgb(28 35 51 / 0.05);
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1;
+}
+.sbx-flow-card-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 6px;
+  background: #fff;
+  border-bottom: 1px solid rgb(28 35 51 / 0.14);
+}
+.sbx-flow-card[data-kind='table'] .sbx-flow-card-head {
+  background: #f2f5fa;
+}
+/* The raw file layer. It sits in the tables column because it IS a data source,
+   but it is not a table — no schema, no columns — and reading it as one is how
+   a landing folder gets mistaken for the Delta table of the same name. A dashed
+   edge says "outside the warehouse" without inventing a new colour. */
+.sbx-flow-card[data-kind='file'] {
+  border-style: dashed;
+}
+.sbx-flow-card[data-kind='file'] .sbx-flow-card-head {
+  background: repeating-linear-gradient(
+    135deg,
+    #f2f5fa,
+    #f2f5fa 6px,
+    #eaeef5 6px,
+    #eaeef5 12px
+  );
+}
+.sbx-flow-card[data-kind='file'] .sbx-flow-card-sub {
+  font-style: italic;
+}
+.sbx-flow-card-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1c2333;
+}
+.sbx-flow-card-sub,
+.sbx-flow-count {
+  flex: none;
+  color: #6b7385;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.sbx-flow-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 2px;
+  background: #e8f0fe;
+  color: #12305e;
+  font-size: 10px;
+  font-weight: 600;
+}
+.sbx-flow-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* Left padding is INLINE (it carries the nesting indent) — see the row
+     render in SequenceCanvas. Only the right side belongs here. */
+  padding: 0 4px 0 0;
+  white-space: nowrap;
+}
+/* An activity inside a pipeline: the tables under it are its I/O, so it reads
+   as a heading rather than as another row of the same kind. */
+.sbx-flow-row[data-tone='run'] {
+  font-weight: 600;
+  color: #1c2333;
+  background: #f3f6fa;
+}
+.sbx-flow-row[data-tone='run'] .sbx-flow-row-name {
+  color: #1c2333;
+}
+.sbx-flow-row:hover {
+  background: #eef2f7;
+}
+.sbx-flow-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #232a3a;
+}
+.sbx-flow-tag {
+  flex: none;
+  padding: 1px 3px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 500;
+}
+.sbx-flow-tag[data-tone='read'] {
+  background: #e2ebfa;
+  color: #1c447f;
+}
+.sbx-flow-tag[data-tone='write'] {
+  background: #d3f0e0;
+  color: #114a2b;
+}
+/* A hop row is one row that is read AND write, so its tag is neither colour —
+   it takes the gradient between them, left to right, the way the data moves. */
+.sbx-flow-tag[data-tone='hop'] {
+  background: linear-gradient(90deg, #e2ebfa, #d3f0e0);
+  color: #1c447f;
+}
+/* A table card's column rows: name left, type right, in the muted weight the
+   Modeling attribute rows use — the schema is context for the lineage, not
+   the thing being traced. */
+.sbx-flow-type {
+  flex: none;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #7b8496;
+  font-size: 10px;
+}
+/* "+n more" / "Show less" — a row, not a button-looking control, so a tall
+   schema stays scannable. */
+.sbx-flow-more {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0 6px;
+  border: 0;
+  border-top: 1px dashed rgb(28 35 51 / 0.18);
+  background: none;
+  color: #5a6478;
+  font: inherit;
+  font-size: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+.sbx-flow-more:hover {
+  background: #eef2f7;
+  color: #1c2333;
+}
+
+/* The single-run `.sbx-actions` / `.sbx-run` BUTTON rules that used to live
+   here are gone. Nothing rendered them any more, but `.sbx-run` is also the
+   class on each executed notebook in the report below — so the dead button
+   styling was painting an accent-coloured bar behind every run block. */
+
+/* ===== Run report (under the lineage canvas) =====
+   Deliberately quiet. The canvas above is the answer; this is the evidence
+   behind it, so it reads as a document — a summary line, then one card per
+   step — rather than as a stack of tinted banners and pills competing with the
+   graph for attention. */
+.sbx-report {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+.sbx-report-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sbx-report-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* The one coloured thing in the report: whether the isolation held. */
+.sbx-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in oklab, var(--color-success) 45%, transparent);
+  color: var(--color-success);
+  font-size: var(--text-micro);
+}
+.sbx-verdict::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sbx-verdict[data-breach] {
+  border-color: color-mix(in oklab, var(--color-destructive) 50%, transparent);
+  color: var(--color-destructive);
+}
+.sbx-breach {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--color-destructive);
+  background: color-mix(in oklab, var(--color-destructive) 8%, transparent);
+  color: var(--color-text-primary);
+  font-size: var(--text-micro);
+}
+
+/* Unreadable input schemas. Deliberately NOT destructive-red: the run is
+   valid, its column lineage is merely incomplete. Warning weight, and
+   collapsed by default because a healthy run should not have to explain
+   itself. */
+.sbx-schema-gap {
+  padding: 8px 12px;
+  border-left: 3px solid var(--color-warning);
+  background: color-mix(in oklab, var(--color-warning) 8%, transparent);
+  font-size: var(--text-micro);
+  color: var(--color-text-primary);
+}
+.sbx-schema-gap > summary {
+  cursor: pointer;
+}
+.sbx-schema-gap ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+/* The verbatim reasons — a second tier, since the refs above are the answer
+   and these are the diagnosis. */
+.sbx-schema-gap .sbx-schema-why {
+  font-family: inherit;
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+}
+.sbx-report-meta dd[data-warn] {
+  color: var(--color-warning);
+}
+
+/* ===== What actually ran =====
+   The only outside evidence in the report — everything else is the analysis
+   grading its own homework. Set off with a rule and a slightly heavier title so
+   it reads as a second section rather than a third warning box, because on a
+   healthy run it is good news and must not look like a problem. */
+.sbx-observed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border);
+}
+.sbx-observed-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sbx-observed-title {
+  margin: 0;
+  font-size: var(--text-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+/* Matches / Differs. Shaped like the isolation verdict but deliberately NOT
+   sharing its palette: a difference here is a discovery, not a breach, and
+   destructive-red would make the most valuable thing this feature produces look
+   like something to suppress. Green when they line up, accent when they do not. */
+.sbx-observed-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in oklab, var(--color-success) 45%, transparent);
+  color: var(--color-success);
+  font-size: var(--text-micro);
+}
+.sbx-observed-verdict::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sbx-observed-verdict[data-differs] {
+  border-color: color-mix(in oklab, var(--color-accent) 50%, transparent);
+  color: var(--color-accent);
+}
+
+.sbx-observed-when {
+  margin-left: auto;
+  font-size: var(--text-micro);
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+}
+.sbx-observed-line {
+  margin: 0;
+  font-size: var(--text-micro);
+  color: var(--color-text-primary);
+}
+
+/* The find: a table the run really touched that nothing predicted. Open by
+   default and given accent weight, because it is the one thing here that
+   cannot be learned any other way. Accent rather than destructive — it is a
+   discovery, not a failure. */
+.sbx-observed-find {
+  padding: 8px 12px;
+  border-left: 3px solid var(--color-accent);
+  background: color-mix(in oklab, var(--color-accent) 8%, transparent);
+  font-size: var(--text-micro);
+  color: var(--color-text-primary);
+}
+.sbx-observed-find p {
+  margin: 0;
+}
+.sbx-observed-find ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+
+.sbx-observed-notes {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--text-micro);
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+}
+
+.sbx-observed-detail {
+  font-size: var(--text-micro);
+  color: var(--color-text-secondary);
+}
+.sbx-observed-detail > summary {
+  cursor: pointer;
+}
+.sbx-observed-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 4px 0 4px 18px;
+}
+.sbx-observed-row-name {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+.sbx-observed-row-fact {
+  margin-left: auto;
+  text-align: right;
+}
+.sbx-observed-row-fact[data-muted] {
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+  font-style: italic;
+}
+
+/* The toggle beside Run. A setting rather than an action, so quieter than the
+   button — but not the 11px secondary it was: a user looking straight at this
+   panel could not find it, which is the same failure as not having it. */
+.sbx-compare-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: var(--text-sm, 12px);
+  color: var(--color-text, inherit);
+  cursor: pointer;
+  user-select: none;
+}
+.sbx-compare-toggle input {
+  cursor: pointer;
+}
+
+/* Run shape as labelled figures — the metadata the old green banner crammed
+   into one sentence. */
+.sbx-report-meta {
+  display: flex;
+  gap: 18px;
+  margin: 0 0 0 auto;
+}
+.sbx-report-meta > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.sbx-report-meta dt {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.sbx-report-meta dd {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+.sbx-report-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+/* one executed notebook inside a step (a pipeline step has several) */
+.sbx-run {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sbx-run + .sbx-run {
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+.sbx-run-name {
+  color: var(--color-text-secondary);
+  font-size: var(--text-micro);
+}
+
+/* Reads and writes side by side, each a scannable column keyed by a coloured
+   left rule — the same read/write hues the canvas edges use. */
+.sbx-io {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.sbx-io-col {
+  --io: var(--color-edge-reads);
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 2px solid color-mix(in oklab, var(--io) 60%, transparent);
+}
+.sbx-io-col[data-tone='write'] {
+  --io: var(--color-edge-writes);
+}
+.sbx-io-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.sbx-io-n {
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--io) 18%, transparent);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.sbx-io-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sbx-io-list li {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+/* A touched table row: click to disclose the schema the run resolved for it.
+   Collapsed by default — a run touches many tables, and an open stack of
+   schemas would push the lineage off screen. */
+.sbx-io-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 1px 2px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sbx-io-row:disabled {
+  cursor: default;
+}
+.sbx-io-row:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--io) 12%, transparent);
+}
+.sbx-io-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sbx-io-chev {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  color: var(--color-text-tertiary);
+  transition: transform 0.12s ease;
+}
+.sbx-io-item[data-open] .sbx-io-chev {
+  transform: rotate(90deg);
+}
+.sbx-io-schema {
+  margin: 2px 0 6px 15px;
+  width: calc(100% - 15px);
+}
+.sbx-io-schema td {
+  padding: 1px 6px 1px 0;
+}
+.sbx-io-none {
+  margin: 4px 0 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+}
+
+.sbx-log {
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  background: var(--color-surface-canvas, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--color-text-secondary);
+  overflow-x: auto;
+}
+.sbx-log-line {
+  white-space: pre;
+  line-height: 1.6;
+}
+
+/* ===== Port settings =====
+   The gear beside "Create model": which of the run's decorations the ported
+   model carries. Anchored to its button rather than a dialog — it is a set of
+   small, reversible preferences read right before pressing Create, so making
+   the user leave the canvas to reach them would cost more than the settings
+   are worth. */
+.sbx-portset {
+  position: relative;
+  flex: 0 0 auto;
+}
+.fx-btn[data-quiet='true'] {
+  padding: 6px 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-micro);
+}
+/* The count of switched-off settings, so a model ported with things missing is
+   never a surprise — the button says so without being opened. */
+.sbx-portset-count {
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--color-surface-canvas, rgba(0, 0, 0, 0.06));
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  font-weight: 600;
+}
+.sbx-portset-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  width: 292px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-1);
+  box-shadow: 0 8px 24px rgb(16 20 30 / 0.16);
+}
+.sbx-portset-lead {
+  margin: 0 0 8px;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.sbx-portset-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 5px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sbx-portset-row:hover {
+  background: var(--color-surface-canvas, rgba(0, 0, 0, 0.04));
+}
+.sbx-portset-row[data-disabled] {
+  cursor: default;
+  opacity: 0.55;
+}
+.sbx-portset-row input {
+  margin-top: 1px;
+  flex: none;
+  accent-color: var(--color-accent);
+}
+.sbx-portset-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: var(--text-sm, 13px);
+}
+.sbx-portset-hint {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* Diff sits beside the view tabs and reads as one of them, set apart by a
+   divider — it changes how the canvas READS rather than how it is arranged. */
+.sbx-diff {
+  margin-left: 6px;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0 4px 4px 0;
+  padding-left: 12px;
+}
+.sbx-diff:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* One strip under the canvas bar: run progress, a diff summary, or how much of
+   the finished run actually resolved. Only ever one of the three, because they
+   answer the same question at three different moments. */
+.sbx-strip {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-micro);
+}
+.sbx-strip-text {
+  position: relative;
+  z-index: 1;
+}
+/* The progress fill, behind the text rather than a separate bar — the strip is
+   already a full-width row, and a second one would be chrome about chrome. */
+.sbx-strip-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in oklab, var(--color-accent) 18%, transparent);
+  transition: width 0.3s ease;
+}
+.sbx-strip[data-tone='warn'] {
+  background: rgb(180 120 20 / 0.08);
+}
+.sbx-strip[data-tone='diff'] {
+  background: rgb(31 111 235 / 0.07);
+}
+.sbx-strip[data-tone='ok'] {
+  background: rgb(22 143 92 / 0.07);
+}
+
+/* A note strip on a card: why this table is thin, or what the diff found. Part
+   of the card's geometry (see NOTE_H) — the rows below shift by exactly this,
+   so an edge still lands on the row it names. */
+.sbx-flow-note {
+  display: flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 6px;
+  border-bottom: 1px solid rgb(28 35 51 / 0.08);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: help;
+}
+.sbx-flow-note[data-level='columns-only'] {
+  background: rgb(180 120 20 / 0.12);
+  color: #7a5410;
+}
+.sbx-flow-note[data-level='bare'] {
+  background: rgb(190 60 60 / 0.12);
+  color: #8c2b2b;
+}
+.sbx-flow-note[data-level='lost'] {
+  background: rgb(190 60 60 / 0.16);
+  color: #8c2b2b;
+}
+/* A card whose schema never resolved is drawn as the outline it is, so it does
+   not read as a table we know the shape of. */
+.sbx-flow-card[data-coverage='bare'] {
+  border-style: dashed;
+}
+/* Run state, while a sequence is going. A step not reached yet is faded: the
+   canvas is a live picture during a run, and a pending card at full strength
+   claims a result it does not have. */
+.sbx-flow-card[data-status='pending'] {
+  opacity: 0.45;
+}
+.sbx-flow-card[data-status='running'] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 18%, transparent);
+}
+.sbx-flow-card[data-status='error'] {
+  border-color: #be3c3c;
+}
+/* Diff marks. Green for what is new, on the card and on the row — the same
+   colour the write edges use, because both mean "this run produced it". */
+.sbx-flow-card[data-change='added'] {
+  border-color: #168f5c;
+  box-shadow: 0 0 0 3px rgb(22 143 92 / 0.14);
+}
+.sbx-flow-row[data-change='added'] {
+  background: rgb(22 143 92 / 0.1);
+}
+
+/* A table row inside its lakehouse card: the object the model nests, drawn as
+   the row it is. Heavier than the column rows beneath it so the card reads as
+   a list of tables first and a schema second. */
+.sbx-flow-row[data-tone='table'] {
+  font-weight: 600;
+  color: #232a3a;
+  border-top: 1px solid rgb(28 35 51 / 0.07);
+}
+.sbx-flow-row[data-tone='table']:first-of-type {
+  border-top: 0;
+}
+/* Its coverage verdict, in the meta slot the column rows use for their type. */
+.sbx-flow-type[data-note='columns-only'] {
+  color: #7a5410;
+  font-weight: 600;
+}
+.sbx-flow-type[data-note='bare'] {
+  color: #8c2b2b;
+  font-weight: 600;
+}
+.sbx-flow-row[data-change='lost-lineage'] {
+  background: rgb(190 60 60 / 0.1);
+}
+
+/* ===== Workspace lineage (/fabric/lineage) =====
+   A full-height page: a control bar, an optional note, and the Modeling canvas
+   filling everything left. The canvas measures itself against its own box, so
+   the column that holds it must be a real flex child with a min-height of 0 —
+   without that it sizes to its content and the canvas gets no height at all. */
+/* `flex: 1`, NOT `height: 100%` — the same rule `.fx-page` follows. The shell
+   drops every route into `.shell-canvas`, a column flex container with no
+   height of its own, so a percentage height has nothing to resolve against and
+   the whole page collapses to zero: it renders, and you see nothing. */
+.fx-lineage-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.fx-lineage-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  height: var(--fx-head-h, 40px);
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-sm, 13px);
+}
+.fx-lineage-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-tertiary);
+}
+.fx-lineage-bar select,
+.fx-lineage-bar button {
+  font: inherit;
+  color: var(--color-text-primary);
+  background: var(--color-surface-raised, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.fx-lineage-bar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Pushed right so the two buttons bracket the bar rather than crowding the
+   select — this is the hint, not a control. */
+.fx-lineage-hint {
+  margin-left: auto;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+}
+.fx-lineage-note,
+.fx-lineage-error {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: var(--text-micro);
+  border-bottom: 1px solid var(--color-border);
+}
+.fx-lineage-note {
+  color: var(--color-text-tertiary);
+}
+.fx-lineage-error {
+  /* `--color-destructive` is the real token; `--color-danger` does not exist,
+     so this silently painted its hardcoded fallback and never themed. */
+  color: var(--color-destructive);
+}
+/* A flex COLUMN, not a plain block. `.mv-host` sizes itself with `flex: 1;
+   min-height: 0` (see the note on it in modeling.css), so a block parent gives
+   it nothing to stretch against and the canvas renders at zero height —
+   everything inside it is absolutely positioned, so there is no content to fall
+   back to and the page reads as empty. Same rules as `.sh-canvas`, which is the
+   other place this viewer is mounted. */
+.fx-lineage-canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.fx-lineage-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  /* `flex: 1` for the same reason as its siblings — this is a flex child now. */
+  flex: 1;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm, 13px);
+}
+
+/* ===== Run report: the sentence, the failures, the cells =====
+   Added because the report answered every question except the first one a
+   person has. All three follow the report's existing idiom — token colours, no
+   full-bleed tints — so they read as part of it rather than bolted on. */
+
+/* One line, set slightly larger than the metadata around it: it is the
+   conclusion, and everything below is the working. */
+.sbx-narrative {
+  margin: 0 0 10px;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm, 13px);
+}
+
+/* Failures, hoisted above everything that went right. Bordered rather than
+   filled: the isolation breach banner is the one thing on this report allowed
+   to be loud, and a second red block would compete with it. */
+.sbx-failures {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-destructive);
+  border-radius: var(--radius-control);
+  background: color-mix(in oklab, var(--color-destructive) 7%, transparent);
+}
+.sbx-failure {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: var(--text-micro);
+}
+.sbx-failure-where {
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+.sbx-failure-what {
+  min-width: 0;
+  color: var(--color-destructive);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+/* Per-cell detail. Open only when something failed — see the note on CellList. */
+.sbx-cells {
+  margin-top: 6px;
+  font-size: var(--text-micro);
+}
+.sbx-cells > summary {
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+.sbx-cell-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sbx-cell {
+  display: flex;
+  gap: 8px;
+  padding: 4px 6px;
+  border-left: 2px solid var(--color-border);
+  border-radius: 0 var(--radius-sm, 4px) var(--radius-sm, 4px) 0;
+  background: var(--color-surface-2);
+}
+/* The only colour in the list, so a failed cell is findable by scanning the
+   left edge rather than by reading every row. */
+.sbx-cell[data-status='error'] {
+  border-left-color: var(--color-destructive);
+}
+.sbx-cell-num {
+  flex: 0 0 auto;
+  min-width: 16px;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.sbx-cell-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.sbx-cell-error {
+  color: var(--color-destructive);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+/* Scrolls rather than stretching the report: a cell that printed a dataframe
+   would otherwise set the height of the whole page. */
+.sbx-cell-out {
+  margin: 2px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sbx-cell-quiet {
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+/* ===== Downstream of a run =====
+   Who finds out when this notebook fails. Sits with the run's own I/O rather
+   than in a section of its own: it is the continuation of "what did this
+   write", not a separate topic. */
+.sbx-downstream {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--color-accent);
+  background: color-mix(in oklab, var(--color-accent) 6%, transparent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.sbx-downstream-title {
+  margin: 0 0 6px;
+  color: var(--color-text-primary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+.sbx-downstream-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: var(--text-micro);
+}
+.sbx-downstream-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+/* Fixed width so the names line up into a column the eye can run down —
+   these lists are read by scanning for one name, not by reading every row. */
+.sbx-downstream-kind {
+  flex: 0 0 auto;
+  min-width: 96px;
+  color: var(--color-text-tertiary);
+}
+.sbx-downstream-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sbx-downstream-via {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+/* "Not checked" and "checked, nothing there" are both this — the WORDS carry
+   the difference, which is why they are never abbreviated to an empty list. */
+.sbx-downstream-note {
+  margin: 8px 0 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  font-style: italic;
+}
+
+/* ===== Run report, quietened =====
+   The report was a stack of equal-weight bordered blocks: header, metadata,
+   narrative, failures, two tinted gap boxes, an observed section, then every
+   step's full detail inline. Nine competing containers, each with its own
+   border and tint, so nothing led and the eye had nowhere to land — which is
+   what "messy" actually was. Hierarchy is carried by TYPE and SPACE here, and
+   borders are spent only where something is genuinely wrong. */
+
+/* The answer, and the largest thing on the page. */
+.sbx-narrative {
+  font-size: var(--text-base);
+  line-height: 1.45;
+  margin: 0 0 var(--spacing-3);
+}
+
+/* One line of quiet metadata, not a grid of boxed pairs. */
+.sbx-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+  margin: 0;
+}
+.sbx-report-meta > div {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.sbx-report-meta dt {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  font-weight: 400;
+}
+.sbx-report-meta dd {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+/* One disclosure for every "here is what the run could not see" statement,
+   replacing three stacked tinted blocks. Borderless when closed: an unopened
+   caveat should not look like a warning banner. */
+.sbx-diagnostics {
+  margin-bottom: var(--spacing-3);
+  font-size: var(--text-micro);
+}
+.sbx-diagnostics > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: 4px 0;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+.sbx-diagnostics-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+  font-variant-numeric: tabular-nums;
+}
+/* Inside the group the individual gaps drop their own frames — they are items
+   in a list now, not sections in their own right. */
+.sbx-diagnostics .sbx-schema-gap {
+  border-left: 0;
+  background: none;
+  padding: var(--spacing-2) 0 0;
+}
+
+/* A step is a row you can open, not a block that is always open. */
+.sbx-step-report {
+  border: 0;
+  border-top: var(--border-width) solid var(--color-border);
+  border-radius: 0;
+  padding: 0;
+  background: none;
+}
+.sbx-step-report-head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) 0;
+  cursor: pointer;
+  list-style: none;
+}
+.sbx-step-report-head::-webkit-details-marker {
+  display: none;
+}
+.sbx-step-report-head:hover {
+  color: var(--color-text-primary);
+}
+/* Pushed to the right so name and status form two columns down the list —
+   these are read by scanning one edge, not by reading each row. */
+.sbx-step-io {
+  margin-left: auto;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+}
+/* The only step that keeps a colour: the one that went wrong. */
+.sbx-step-report[data-status='error'] > .sbx-step-report-head {
+  box-shadow: inset 2px 0 0 var(--color-destructive);
+  padding-left: var(--spacing-2);
+}
+
+/* A restored run's staleness notice. Amber, like demo mode's badge: a state
+   the reader must factor in, not an error and not decoration. */
+.sbx-restored {
+  margin: 0;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: #fdf6e3;
+  color: #6b4d0f;
+  font-size: var(--text-micro);
+  line-height: 1.5;
+}
+
+/* Add code: the sandbox's other door, for when there is no Fabric to browse. */
+.sbx-add {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--spacing-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-2);
+}
+.sbx-add-row {
+  display: flex;
+  gap: 4px;
+}
+.sbx-add-row input {
+  flex: 1;
+  min-width: 0;
+}
+.sbx-add textarea {
+  min-height: 110px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1.5;
+  padding: var(--spacing-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-input);
+  background: var(--color-surface-1);
+  color: var(--color-text-primary);
+}
+.sbx-add-error {
+  margin: 0;
+  font-size: var(--text-micro);
+  color: var(--color-destructive);
+  line-height: 1.45;
+}
+
+/* Table answers: what we know about a table, in sentences. */
+.fx-answers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.fx-answers-none,
+.fx-answers-note {
+  margin: var(--spacing-2) 0;
+  font-size: var(--text-micro);
+  line-height: 1.55;
+  color: var(--color-text-tertiary);
+}
+.fx-answers-block h3 {
+  margin: 0 0 4px;
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+}
+.fx-answers-block p {
+  margin: 0 0 2px;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+.fx-answers-quiet {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-micro);
+}
+/* Amber, not red: code edited since the last run is a caveat to weigh, not a
+   failure — but it must not be missable, because everything above it is
+   describing code that never executed. */
+.fx-answers-warn {
+  margin-top: 4px;
+  padding: 4px 7px;
+  border-radius: var(--radius-input);
+  background: #fdf6e3;
+  color: #6b4d0f;
+  font-size: var(--text-micro);
+  line-height: 1.45;
+}
+.fx-answers-state {
+  font-weight: 600;
+}
+.fx-answers-state[data-ok] { color: #168f5c; }
+.fx-answers-state[data-bad] { color: var(--color-destructive); }
+
+.fx-answers-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: var(--text-micro);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+.fx-answers-list ul {
+  margin: 1px 0 0 var(--spacing-3);
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-tertiary);
+}
+.fx-answers-list code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+/* Export and the gaps worklist, at the top of the run report. */
+.sbx-export {
+  display: flex;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) 0;
+}
+
+.sbx-gaps {
+  margin-bottom: var(--spacing-3);
+  padding: var(--spacing-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-1);
+  font-size: var(--text-micro);
+}
+.sbx-gaps > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.sbx-gaps ul {
+  margin: var(--spacing-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sbx-gaps li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px var(--spacing-2);
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+.sbx-gap-badge {
+  justify-self: end;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+}
+/* A table whose schema would not resolve is the bigger problem, and usually
+   the cause of the others — so it is the one that is tinted. */
+.sbx-gaps li[data-level='bare'] .sbx-gap-badge {
+  background: #f7e0e0;
+  color: #8c2f2f;
+}
+.sbx-gap-reason {
+  grid-column: 1 / -1;
+  color: var(--color-text-tertiary);
+}
+.sbx-gap-note {
+  grid-column: 1 / -1;
+  justify-self: start;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-accent, #2563eb);
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--text-micro);
+}
+.sbx-gap-note-edit {
+  grid-column: 1 / -1;
+}
+.sbx-gap-note-edit input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  font: inherit;
+  font-size: var(--text-micro);
+}
+
+/* Asset binding: which models contain this table, and adding it to one. */
+.fx-bind {
+  padding: var(--spacing-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.fx-bind > h3 {
+  margin: 0 0 8px;
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+}
+
+/* A bento grid rather than a list: several models containing the same table
+   is the interesting case (that's the whole point of asking), and cards
+   scan as a set at a glance where a list of names reads as one long line. */
+.fx-bind-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.fx-bind-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-1);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.1s, background 0.1s;
+}
+.fx-bind-card:hover {
+  border-color: var(--color-accent-hi);
+  background: var(--color-accent-dim);
+}
+.fx-bind-card-name {
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fx-bind-card-desc {
+  margin: 0;
+  font-size: var(--text-micro);
+  color: var(--color-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.fx-bind-card-stats {
+  margin-top: auto;
+  padding-top: 2px;
+  font-size: var(--text-micro);
+  color: var(--color-text-tertiary);
+}
+
+/* ===== Task steps =====
+   The run checklist. Ported from a Tailwind/motion component; the four
+   animations it used springs and a JS runtime for are keyframes here.
+
+   Colours come from the app's tokens rather than the original's stone/emerald
+   scale, so this matches the rest of the toolkit in both themes instead of
+   introducing a second palette. */
+
+.ts-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ts-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 28px;
+  padding: 0 4px;
+  font-size: 12.5px;
+  color: var(--color-text-tertiary);
+  transition: color 0.2s;
+}
+.ts-row[data-status='done'] { color: var(--color-text-secondary); }
+.ts-row[data-status='active'] { color: var(--color-text-primary); font-weight: 500; }
+.ts-row[data-status='error'] { color: var(--color-destructive); font-weight: 500; }
+
+/* The marker box. Fixed size at every status so the labels never shift as a
+   run walks down the list. */
+.ts-mark {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 5px;
+}
+.ts-row[data-status='done'] .ts-mark {
+  background: color-mix(in oklch, #168f5c 14%, transparent);
+  color: #168f5c;
+  animation: ts-pop 0.24s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.ts-row[data-status='error'] .ts-mark {
+  background: color-mix(in oklch, var(--color-destructive) 12%, transparent);
+  color: var(--color-destructive);
+  animation: ts-pop 0.24s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.ts-row[data-status='active'] .ts-mark { color: var(--color-accent); }
+/* Pending is a dot rather than an empty box: an outline would read as an
+   unticked checkbox, which invites clicking. */
+.ts-row[data-status='pending'] .ts-mark::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--color-border-strong, #98a0b0);
+}
+
+.ts-arc {
+  width: 12px;
+  height: 12px;
+  animation: ts-spin 0.8s linear infinite;
+}
+
+.ts-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The sweep across the running step's label — the original's shimmer, done
+   with background-clip. Falls back to a plain colour where the browser will
+   not clip a gradient to text. */
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .ts-row[data-status='active'] .ts-label {
+    background: linear-gradient(
+      90deg,
+      var(--color-text-tertiary) 38%,
+      var(--color-text-primary) 50%,
+      var(--color-text-tertiary) 62%
+    );
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: ts-sweep 1.6s linear infinite;
+  }
+}
+
+.ts-meta {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.ts-row[data-status='done'] .ts-meta { opacity: 1; }
+
+.ts-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes ts-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ts-pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes ts-sweep {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+/* Honoured by the stylesheet, so it holds before this component's JavaScript
+   has run — which the original's useReducedMotion hook cannot manage. */
+@media (prefers-reduced-motion: reduce) {
+  .ts-arc,
+  .ts-row[data-status='active'] .ts-label,
+  .ts-row[data-status='done'] .ts-mark,
+  .ts-row[data-status='error'] .ts-mark {
+    animation: none;
+  }
+  .ts-row[data-status='active'] .ts-label {
+    background: none;
+    color: var(--color-text-primary);
+  }
+}
+
+/* A finished step's duration, kept after the run so it can still be read. */
+.sbx-step-ms {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
+}

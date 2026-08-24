@@ -1,0 +1,94 @@
+/* Base reset.
+ *
+ * This replaces Tailwind's preflight. The codebase uses zero Tailwind utility
+ * classes — the whole framework was in the bundle for these ~30 lines. Every
+ * rule below was verified against the computed styles preflight produced, so
+ * the visual result is unchanged.
+ *
+ * Anything removed from here changes layout somewhere, so it is deliberately
+ * minimal rather than a general-purpose reset.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* The inherited default for everything that does not set its own. Dropping
+   this is a visible regression: text in any element without an explicit
+   line-height tightens to the font's own metric and shifts. */
+html {
+  line-height: 1.5;
+}
+
+/* Zeroed globally: the app sets spacing explicitly everywhere, and inherited
+   user-agent margins on headings and paragraphs fight it. */
+* {
+  margin: 0;
+}
+
+/* Lists are used for structure, not for bullets. */
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+/* Headings are styled by class; the user agent's sizes and weights are noise. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/* Form controls do not inherit typography from their ancestors on their own,
+   which is what makes an unstyled button render in the platform UI font. */
+button,
+input,
+optgroup,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* User agents render placeholders at their own colour and opacity, which do
+   not track the input's. Half of currentColor is what the design expects. */
+::placeholder {
+  opacity: 1;
+  color: color-mix(in oklab, currentColor 50%, transparent);
+}
+
+/* Replaced elements sit on the text baseline by default, which leaves a gap
+   under every inline SVG icon. The rail and the canvas are full of them. */
+img,
+svg,
+video,
+canvas,
+audio,
+iframe,
+embed,
+object {
+  display: block;
+  vertical-align: middle;
+}
+
+/* Undone for content images, which should still scale within their box. */
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}

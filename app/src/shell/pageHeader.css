@@ -1,0 +1,52 @@
+/* The shared Models / Fabric Toolkit top bar.
+   Lifted verbatim from modelBrowser.css's .mb-top block when the Fabric
+   Toolkit grew the same header — two copies of a bar that must look identical
+   is how they stop looking identical. */
+
+.ph-top {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-6);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-1);
+}
+
+.ph-title {
+  margin: 0;
+  font-size: var(--text-display);
+  line-height: var(--text-display--line-height);
+  letter-spacing: var(--text-display--letter-spacing);
+  font-weight: 600;
+}
+
+.ph-spacer {
+  flex: 1;
+}
+
+/* The app mark, left of the heading — and the mode switch. It reads as a
+   logo and behaves as a button, so it needs the hover and focus affordances
+   the decorative span it replaced did not: without them it looks like
+   branding and nobody discovers it. */
+.ph-brand {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: var(--radius-input);
+  color: var(--color-text-primary);
+}
+.ph-brand:hover {
+  background: var(--color-surface-2);
+}
+.ph-brand svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

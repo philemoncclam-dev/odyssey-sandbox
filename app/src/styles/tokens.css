@@ -1,0 +1,274 @@
+@import "./reset.css";
+
+/* ===== Self-hosted variable fonts (DS-01, DS-06) =====
+   Vendored into frontend/public/fonts/ by plan 01-01, task 2 — the src URL
+   below is byte-identical to the preload href in index.html in both dev and
+   a production build. unicode-range matches Fontsource's own latin subset:
+   characters outside it (e.g. U+2318, the search trigger's command-key
+   glyph) fall through to the next family in the --font-sans/--font-mono
+   stack instead of rendering as tofu. */
+@font-face {
+  font-family: "Geist Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/geist-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Geist Mono Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/geist-mono-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ===== Tier 1 / Tier 2 design tokens =====
+   `:root`, not `@theme`. This block was written for Tailwind v4, whose
+   `@theme` at-rule its build step consumed. Tailwind was removed in the port —
+   the framework was in the bundle for a reset the app now owns — and `@theme`
+   went from a directive to an unknown at-rule, which every browser drops
+   ENTIRELY along with all ~160 declarations inside it. Nothing errored: the
+   app just rendered with no tokens at all, so `var(--font-sans)` and every
+   colour fell back to the initial value and the whole UI came up as unstyled
+   Times New Roman.
+   These are plain custom properties, so `:root` is exactly equivalent. Do not
+   reintroduce `@theme` without reintroducing Tailwind with it. */
+:root {
+  /* --- Tier 1 — OKLCH primitives (THEME-01): each swatch declared exactly once as light-dark(<light>, <dark>) — light-dark() takes the light-theme value first, the dark-theme value second. Every value below is verbatim from 01-UI-SPEC.md's Color System tables (computed with Björn Ottosson's OKLab reference matrices), never eyeballed or re-derived. --- */
+
+  /* Neutral ramp — four surface tiers + two border tokens */
+  --slate-0: light-dark(oklch(0.975 0.006 268), oklch(0.165 0.018 266)); /* canvas */
+  --slate-1: light-dark(oklch(0.99 0.0015 268), oklch(0.215 0.027 266)); /* card */
+  --slate-2: light-dark(oklch(0.995 0.001 268), oklch(0.257 0.032 266)); /* raised */
+  --slate-3: light-dark(oklch(1.0 0 0), oklch(0.299 0.036 266)); /* overlay/modal */
+  --slate-4: light-dark(oklch(0.88 0.016 268), oklch(0.329 0.034 266)); /* border */
+  --slate-5: light-dark(oklch(0.66 0.024 268), oklch(0.52 0.030 266)); /* border-strong */
+
+  /* Text ramp — three tiers */
+  --slate-6: light-dark(oklch(0.545 0.032 268), oklch(0.589 0.046 270)); /* tertiary */
+  /* audit-tokens.mjs finding (check 3): 01-UI-SPEC.md's own verification
+     table only computed text tiers "vs canvas" (dark 4.65:1, passing) and
+     never checked text against the raised-surface tiers DS-05 itself
+     introduces. This audit's more exhaustive per-surface cross-product
+     (required by 01-02-PLAN.md's check-3 action text) found that dark-theme
+     tertiary text falls below 4.5:1 against surface-1/2/3 (4.23/3.79/3.31).
+     This locked Phase-1 value cannot be re-derived by this plan; the three
+     pairs are narrowly exempted in audit-tokens.mjs with this same
+     reasoning, and the gap is recorded as a concrete follow-up for the
+     first phase that renders tertiary text on a raised dark surface. */
+  --slate-7: light-dark(oklch(0.50 0.034 264), oklch(0.743 0.037 270)); /* secondary */
+  --slate-8: light-dark(oklch(0.257 0.032 266), oklch(0.938 0.011 270)); /* primary */
+
+  /* Accent (state channel — traced/hover on both canvases, focus rings, CTA) */
+  --cyan-1: light-dark(oklch(0.52 0.115 232), oklch(0.754 0.139 233));
+  --cyan-2: light-dark(oklch(0.44 0.12 232), oklch(0.828 0.101 230)); /* hover/pressed */
+  --cyan-3: light-dark(oklch(0.93 0.03 232), oklch(0.273 0.050 240)); /* wash */
+
+  /* Domain palette (knowledge-graph hue channel — THEME-05/THEME-06 re-derivation) */
+  --gold-1: light-dark(oklch(0.62 0.14 95), oklch(0.85 0.14 95));
+  /* Gold is a true yellow-gold (H95°); the previous green-for-gold value
+     (#16a06b/#34d39c) is retired. Yellow was chosen deliberately over
+     green: with blue, it is one of the two hues that survives red-green
+     colour deficiency (protanopia/deuteranopia) largely intact, unlike the
+     retired green, which sat close to Bronze's orange under CVD
+     simulation. */
+  --amber-1: light-dark(oklch(0.48 0.15 48), oklch(0.65 0.15 48)); /* bronze */
+  /* Caution. A separate primitive from bronze rather than a reuse of it: bronze
+     is a DOMAIN identity (a medallion layer) and this is a STATUS, and the two
+     appear on the same screen — a bronze card beside a warning that were the
+     same swatch would make the legend a lie. Pushed yellow-ward (hue 75 vs 48)
+     and lighter, which is also the direction that reads as caution rather than
+     as a material. */
+  --amber-2: light-dark(oklch(0.58 0.14 75), oklch(0.76 0.14 75)); /* warning */
+  --rose-1: light-dark(oklch(0.56 0.16 350), oklch(0.72 0.16 350)); /* notebook */
+  --steel-1: light-dark(oklch(0.35 0.03 235), oklch(0.45 0.03 235)); /* silver */
+  /* Silver's hue (235 degrees) sits only ~2-3 degrees from the accent's
+     (233 dark / 232 light) — this is deliberate and safe, not a collision:
+     silver's chroma (0.03) is roughly 4-5x lower than the accent's
+     (0.115-0.139), which is the actual separation mechanism, not an
+     oversight. Do not "fix" this by moving silver's hue — it would drift
+     toward bronze (48 degrees) or notebook (350 degrees) and create a real
+     collision. This is the one pair audit-tokens.mjs allowlists by name. */
+  /* audit-tokens.mjs finding (check 3): silver's dark-theme contrast
+     against canvas is 2.60:1 (this is 01-UI-SPEC.md's own verbatim table
+     value, not something introduced here) — below the 3:1 non-text
+     threshold. Silver is deliberately the lowest-chroma domain swatch by
+     design and is required (THEME-06) to always carry a redundant
+     text-label second channel in the legend, so WCAG 1.4.1's "not colour
+     alone" is independently satisfied even where the raw 1.4.11
+     graphical-object ratio alone falls just short. Narrowly exempted in
+     audit-tokens.mjs (dark-vs-canvas only; light theme clears 10.51:1). */
+
+  /* Edge-type palette (lineage DAG hue channel — the other half of the THEME-05 fix) */
+  --indigo-1: light-dark(oklch(0.62 0.12 272), oklch(0.80 0.10 272)); /* reads */
+  --violet-1: light-dark(oklch(0.40 0.15 315), oklch(0.55 0.15 315)); /* writes */
+  --graphite-1: light-dark(oklch(0.72 0.02 266), oklch(0.38 0.02 266)); /* derives */
+  /* Derives is deliberately low-contrast and near-achromatic — it is the
+     lowest-confidence edge type (an unattributed transform, no strong
+     signal either way) and carries no required information on its own, so
+     it is the single token exempt from the 3:1 non-text WCAG threshold
+     (see audit-tokens.mjs check 3). */
+
+  /* Status colours */
+  --red-1: light-dark(oklch(0.50 0.19 15), oklch(0.68 0.19 15)); /* destructive */
+  /* Reserved exclusively for destructive-action affordances (Purview
+     overwrite warnings, delete confirmations — consumed starting Phase 5).
+     Defined now so Phase 5 doesn't invent an ad hoc red. */
+  --green-1: light-dark(oklch(0.50 0.11 160), oklch(0.78 0.15 165)); /* success */
+
+  /* --- Tier 2 — semantic roles (THEME-01): each references exactly one tier-1 primitive above and never holds a literal colour value of its own. --- */
+  --color-surface-canvas: var(--slate-0);
+  --color-surface-1: var(--slate-1);
+  --color-surface-2: var(--slate-2);
+  --color-surface-3: var(--slate-3);
+  --color-border: var(--slate-4);
+  --color-border-strong: var(--slate-5);
+  --color-text-primary: var(--slate-8);
+  --color-text-secondary: var(--slate-7);
+  --color-text-tertiary: var(--slate-6);
+  --color-accent: var(--cyan-1);
+  --color-accent-hi: var(--cyan-2);
+  --color-accent-dim: var(--cyan-3);
+  --color-domain-gold: var(--gold-1);
+  --color-domain-bronze: var(--amber-1);
+  --color-domain-notebook: var(--rose-1);
+  --color-domain-silver: var(--steel-1);
+  /* Not in the approved UI-SPEC — flagged in plan 01-01's assumption 4.
+     Both reference an existing primitive so no new hue enters the
+     system. */
+  --color-domain-neutral: var(--slate-6); /* fallback domain colour for colorFor() in model.tsx; matches the neutral default the tick indicator already renders */
+  --color-edge-reads: var(--indigo-1);
+  --color-edge-writes: var(--violet-1);
+  --color-edge-derives: var(--graphite-1);
+  --color-grid-dot: var(--slate-4); /* dot-grid canvas background on both canvases */
+  --color-destructive: var(--red-1);
+  --color-success: var(--green-1);
+  /* Caution WITHOUT failure — a run that is valid but incomplete, an item drawn
+     without its dependencies, a schema that could not be read. Distinct from
+     destructive on purpose: painting "your column lineage is thin" the same red
+     as "this deletes data" teaches people to ignore both. Referenced by
+     `.sbx-schema-gap` and the report's `[data-warn]` figures, which until now
+     named a token that did not exist and silently painted a literal — so they
+     never followed the theme. Shares amber-1 with the bronze domain colour: the
+     hue already exists, and no new one enters the system. */
+  --color-warning: var(--amber-2);
+
+  /* Elevation (DS-05): on dark, shadow is supplementary only — lightness stepping plus the border token carry elevation there, because a near-black canvas has almost no headroom to go darker, which is why shadow-as-primary silently stops reading. On light, shadow is a legitimate primary mechanism — white has almost no lightness headroom, so shadow plus border do the perceptual work instead. Each shadow layer's colour switches between themes via the primitive mechanism; the dark theme's second layer is transparent so all three tiers share one visible reference shadow rather than a fabricated multi-layer dark shadow. */
+  --shadow-card: 0 1px 2px light-dark(rgb(28 35 51 / 0.04), rgb(0 0 0 / 0.35)), 0 4px 12px light-dark(rgb(28 35 51 / 0.08), transparent);
+  --shadow-raised: 0 2px 4px light-dark(rgb(28 35 51 / 0.06), rgb(0 0 0 / 0.35)), 0 8px 20px light-dark(rgb(28 35 51 / 0.10), transparent);
+  --shadow-overlay: 0 8px 24px light-dark(rgb(28 35 51 / 0.14), rgb(0 0 0 / 0.35)), 0 24px 48px light-dark(rgb(28 35 51 / 0.18), transparent);
+
+  /* --- Typography (DS-01, DS-03) --- */
+  --font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
+
+  --text-micro: 11px;
+  --text-micro--line-height: 1.35;
+  --text-micro--letter-spacing: 0;
+
+  --text-base: 13px;
+  --text-base--line-height: 1.45;
+  --text-base--letter-spacing: 0;
+
+  --text-heading: 18px;
+  --text-heading--line-height: 1.3;
+  --text-heading--letter-spacing: -0.006em;
+
+  --text-display: 22px;
+  --text-display--line-height: 1.25;
+  --text-display--letter-spacing: -0.01em;
+
+  /* --- Spacing (DS-04) — every step is a 4px multiple --- */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+
+  /* --- Radius --- */
+  --radius-card: 6px;
+  --radius-input: 5px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+}
+
+/* ===== Density primitives + theme mechanism (THEME-02) =====
+   The color-scheme declaration below, paired with the light/dark switch
+   built into every tier-1 primitive (plan 01-02), is the single theme
+   mechanism. The app flips themes by setting data-theme on the document
+   element; no media query is declared here. */
+:root {
+  --border-width: 1px;
+  --row-height: 28px;
+  /* Model Viewer layer band: LAYER_HEADER_HEIGHT (30px) + its 1px bottom rule.
+     Lives here because shell.css positions the floating rail beneath it and
+     modeling.css sizes the band itself — both need the same number. */
+  --mv-band-height: 31px;
+  /* Model Viewer top bar (logo + model name), which sits ABOVE the band. Same
+     reason it lives here: modeling.css sizes it and insets the scroller by it,
+     shell.css offsets the floating rail by it. */
+  --mv-topbar-height: 36px;
+
+  color-scheme: light dark;
+  font-synthesis: none;
+}
+
+/* data-theme is the single explicit theme switch — light-dark() inside every
+   tier-1 primitive above does the rest. Neither block below redefines a
+   token; if a future edit adds one here, that value belongs in tier 1
+   instead (see 01-UI-SPEC.md's "Retired Values — Explicit Grep Targets"). */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* ===== Base reset ===== */
+* {
+  box-sizing: border-box;
+}
+
+/* One focus ring for the whole app.
+   Before this there were four `:focus-visible` rules in the entire frontend, so
+   keyboard focus was invisible on almost every control on every screen — and
+   where it did show, it showed differently. Wrapped in `:where()` so it carries
+   ZERO specificity: it is a floor, and any component that wants its own ring
+   still wins without needing `!important` or a longer selector.
+   `:focus-visible` rather than `:focus` keeps it off mouse clicks, which is why
+   a visible ring is affordable on everything at once. */
+:where(
+  a[href],
+  button,
+  input,
+  select,
+  summary,
+  textarea,
+  [tabindex]:not([tabindex='-1'])
+):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+code {
+  font-family: var(--font-mono);
+}

@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Odyssey Sandbox</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, Segoe UI, sans-serif; max-width: 980px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.3rem; }
+  nav { display: flex; gap: .5rem; margin-bottom: 1.5rem; border-bottom: 1px solid #8888; }
+  nav button { background: none; border: none; padding: .6rem 1rem; cursor: pointer; font-size: 1rem; border-bottom: 2px solid transparent; }
+  nav button.active { border-bottom-color: currentColor; font-weight: 600; }
+  section { display: none; }
+  section.active { display: block; }
+  fieldset { border: 1px solid #8886; border-radius: 8px; margin-bottom: 1rem; padding: 1rem; }
+  legend { padding: 0 .4rem; font-weight: 600; }
+  label { display: block; margin: .5rem 0 .2rem; font-size: .85rem; opacity: .8; }
+  input, select, textarea { width: 100%; box-sizing: border-box; padding: .4rem .5rem; font-family: inherit; font-size: .9rem; }
+  textarea { min-height: 140px; font-family: ui-monospace, Consolas, monospace; }
+  button.action { margin-top: .8rem; padding: .5rem 1rem; cursor: pointer; }
+  .row { display: flex; gap: 1rem; }
+  .row > div { flex: 1; }
+  pre { background: #8881; padding: .8rem; border-radius: 6px; overflow: auto; max-height: 400px; font-size: .8rem; }
+  .status { font-size: .85rem; opacity: .75; margin-top: .3rem; }
+  .status.error { color: #d33; opacity: 1; }
+  .status.ok { color: #2a8; opacity: 1; }
+  ul.picklist { list-style: none; padding: 0; margin: .3rem 0; max-height: 220px; overflow: auto; border: 1px solid #8886; border-radius: 6px; }
+  ul.picklist li { padding: .4rem .6rem; cursor: pointer; border-bottom: 1px solid #8883; }
+  ul.picklist li:hover { background: #8881; }
+  ul.picklist li.selected { background: #48f3; }
+  fieldset[disabled] { opacity: .5; }
+</style>
+</head>
+<body>
+<h1>Odyssey Sandbox</h1>
+<nav>
+  <button data-tab="explore" class="active">Explore</button>
+  <button data-tab="sandbox">Sandbox</button>
+</nav>
+
+<section id="tab-explore" class="active">
+  <fieldset>
+    <legend>Fabric sign-in</legend>
+    <div class="status" id="fabric-status">checking…</div>
+    <button class="action" id="btn-signin">az login</button>
+  </fieldset>
+
+  <div class="row">
+    <div>
+      <fieldset>
+        <legend>Workspaces</legend>
+        <button class="action" id="btn-load-workspaces">Load</button>
+        <ul class="picklist" id="list-workspaces"></ul>
+      </fieldset>
+    </div>
+    <div>
+      <fieldset>
+        <legend>Notebooks</legend>
+        <ul class="picklist" id="list-notebooks"></ul>
+      </fieldset>
+    </div>
+    <div>
+      <fieldset>
+        <legend>Pipelines</legend>
+        <ul class="picklist" id="list-pipelines"></ul>
+      </fieldset>
+    </div>
+  </div>
+  <div class="status" id="explore-status"></div>
+  <button class="action" id="btn-send-to-sandbox" disabled>Send selected notebook to Sandbox &rarr;</button>
+
+  <fieldset id="pipeline-tree-fieldset" style="display:none">
+    <legend>Pipeline activities (nested pipelines expanded, deepest level shown)</legend>
+    <pre id="pipeline-tree"></pre>
+    <button class="action" id="btn-run-pipeline">Run whole pipeline in Sandbox &rarr;</button>
+    <div class="status" id="pipeline-run-status"></div>
+  </fieldset>
+</section>
+
+<section id="tab-sandbox">
+  <fieldset>
+    <legend>Notebook cells</legend>
+    <label>Cells (one Python/PySpark cell per line — paste your notebook's source, or send one from Explore)</label>
+    <textarea id="cells-input" placeholder="spark.sql('SELECT id, name FROM bronze.customers')
+df.write.saveAsTable('silver.customers')"></textarea>
+    <label>Workspace / lakehouse (optional, for ref resolution)</label>
+    <div class="row">
+      <div><input id="sandbox-workspace" placeholder="workspace name" /></div>
+      <div><input id="sandbox-lakehouse" placeholder="lakehouse name" /></div>
+    </div>
+    <button class="action" id="btn-run-sandbox">Run</button>
+    <div class="status" id="sandbox-status"></div>
+  </fieldset>
+
+  <fieldset id="results-fieldset" disabled>
+    <legend>Run result</legend>
+    <pre id="results-output">Run the sandbox to see reads, writes and column lineage here.</pre>
+  </fieldset>
+
+  <fieldset id="push-fieldset" disabled>
+    <legend>Port to Solidatus</legend>
+    <label>Solidatus base URL</label>
+    <input id="solidatus-base-url" placeholder="https://your-instance.solidatus.com" />
+    <label>API token (scopes: Create model, View model)</label>
+    <input id="solidatus-token" type="password" placeholder="paste token — never saved to disk" />
+    <label>
+      <input type="radio" name="solidatus-mode" value="create" checked style="width:auto;display:inline" />
+      Create new model
+    </label>
+    <input id="solidatus-model-name" placeholder="model name" />
+    <label>
+      <input type="radio" name="solidatus-mode" value="update" style="width:auto;display:inline" />
+      Update existing model
+    </label>
+    <input id="solidatus-model-id" placeholder="existing model id" />
+    <button class="action" id="btn-push-solidatus">Push</button>
+    <div class="status" id="push-status"></div>
+  </fieldset>
+</section>
+
+<script>
+const API = '';
+let lastRunResult = null;
+let selectedWorkspace = null;
+let selectedNotebook = null;
+
+async function api(path, opts) {
+  const res = await fetch(API + path, opts);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+
+function setStatus(el, text, kind) {
+  el.textContent = text;
+  el.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+// --- tabs ---
+document.querySelectorAll('nav button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('section').forEach((s) => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// --- explore ---
+async function refreshFabricStatus() {
+  const el = document.getElementById('fabric-status');
+  try {
+    const s = await api('/fabric/status');
+    setStatus(el, s.signedIn ? 'Signed in.' : (s.error || 'Not signed in.'), s.signedIn ? 'ok' : '');
+  } catch (e) {
+    setStatus(el, e.message, 'error');
+  }
+}
+refreshFabricStatus();
+
+document.getElementById('btn-signin').addEventListener('click', async () => {
+  const el = document.getElementById('fabric-status');
+  setStatus(el, 'Running az login — check for a browser/device-code prompt…');
+  try {
+    await api('/fabric/login', { method: 'POST' });
+    await refreshFabricStatus();
+  } catch (e) {
+    setStatus(el, e.message, 'error');
+  }
+});
+
+document.getElementById('btn-load-workspaces').addEventListener('click', async () => {
+  const list = document.getElementById('list-workspaces');
+  const status = document.getElementById('explore-status');
+  list.innerHTML = '';
+  try {
+    const { items } = await api('/fabric/workspaces');
+    for (const w of items) {
+      const li = document.createElement('li');
+      li.textContent = w.name;
+      li.addEventListener('click', async () => {
+        list.querySelectorAll('li').forEach((n) => n.classList.remove('selected'));
+        li.classList.add('selected');
+        selectedWorkspace = w;
+        selectedNotebook = null;
+        document.getElementById('btn-send-to-sandbox').disabled = true;
+        await loadNotebooks(w.id);
+      });
+      list.appendChild(li);
+    }
+    setStatus(status, `${items.length} workspace(s).`, 'ok');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+});
+
+async function loadNotebooks(workspaceId) {
+  const list = document.getElementById('list-notebooks');
+  const pipelineList = document.getElementById('list-pipelines');
+  const status = document.getElementById('explore-status');
+  list.innerHTML = '';
+  pipelineList.innerHTML = '';
+  document.getElementById('pipeline-tree-fieldset').style.display = 'none';
+  try {
+    const items = await api(`/fabric/workspaces/${workspaceId}/items`);
+    for (const nb of items.notebooks) {
+      const li = document.createElement('li');
+      li.textContent = nb.name;
+      li.addEventListener('click', () => {
+        list.querySelectorAll('li').forEach((n) => n.classList.remove('selected'));
+        li.classList.add('selected');
+        selectedNotebook = nb;
+        document.getElementById('btn-send-to-sandbox').disabled = false;
+      });
+      list.appendChild(li);
+    }
+    for (const p of items.pipelines || []) {
+      const li = document.createElement('li');
+      li.textContent = p.name;
+      li.addEventListener('click', async () => {
+        pipelineList.querySelectorAll('li').forEach((n) => n.classList.remove('selected'));
+        li.classList.add('selected');
+        await loadPipelineTree(workspaceId, p);
+      });
+      pipelineList.appendChild(li);
+    }
+    setStatus(status, `${items.notebooks.length} notebook(s), ${(items.pipelines || []).length} pipeline(s).`, 'ok');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
+let currentPipeline = null; // { workspaceId, activities }
+
+/** How many " / " hops deep an (already-flattened) activity name is — its nesting level. */
+function activityDepth(name) {
+  return (name.match(/ \/ /g) || []).length;
+}
+
+/** Same trailing-leaf label the run cards use — strip the orchestration prefix and the invoke verb. */
+function activityLabel(name) {
+  const leaf = name.includes(' / ') ? name.slice(name.lastIndexOf(' / ') + 3) : name;
+  return leaf.replace(/^(?:run|invoke|execute|call)\s+(?=\S)/i, '');
+}
+
+async function loadPipelineTree(workspaceId, pipeline) {
+  const status = document.getElementById('explore-status');
+  const fieldset = document.getElementById('pipeline-tree-fieldset');
+  const pre = document.getElementById('pipeline-tree');
+  pre.textContent = 'Loading (this recurses into every nested pipeline)…';
+  fieldset.style.display = 'block';
+  try {
+    const { activities } = await api(`/fabric/workspaces/${workspaceId}/pipelines/${pipeline.id}/definition`);
+    currentPipeline = { workspaceId, activities };
+    pre.textContent = activities
+      .map((a) => {
+        const indent = '  '.repeat(activityDepth(a.name));
+        const kind = a.notebook_id ? 'notebook' : a.pipeline_id ? 'pipeline (expanded below)' : a.type;
+        const io = [...(a.reads || []), ...(a.writes || [])].length
+          ? `  [reads: ${(a.reads || []).join(', ') || '-'} | writes: ${(a.writes || []).join(', ') || '-'}]`
+          : '';
+        return `${indent}${activityLabel(a.name)}  (${kind})${io}`;
+      })
+      .join('\n');
+    setStatus(status, `${activities.length} activities total, nested pipelines included.`, 'ok');
+  } catch (e) {
+    pre.textContent = '';
+    setStatus(status, e.message, 'error');
+  }
+}
+
+/** Kahn's algorithm — an activity only runs once everything it depends_on has. */
+function orderActivities(activities) {
+  const known = new Set(activities.map((a) => a.name));
+  const pending = activities.slice();
+  const done = new Set();
+  const out = [];
+  while (pending.length) {
+    const i = pending.findIndex((a) => (a.depends_on || []).every((d) => !known.has(d) || done.has(d)));
+    if (i < 0) break;
+    const [a] = pending.splice(i, 1);
+    done.add(a.name);
+    out.push(a);
+  }
+  return [...out, ...pending];
+}
+
+document.getElementById('btn-run-pipeline').addEventListener('click', async () => {
+  const status = document.getElementById('pipeline-run-status');
+  if (!currentPipeline) return;
+  const { workspaceId, activities } = currentPipeline;
+  const ordered = orderActivities(activities);
+
+  const carried = {}; // ref -> columns, filled by each run/Copy, consumed by the next
+  const combined = { ok: true, engine: 'sandbox+definition', reads: [], writes: [], table_schemas: {}, column_lineage: [], log: [] };
+  const addSet = (arr, items) => { for (const x of items) if (!arr.includes(x)) arr.push(x); };
+  const carry = (schemas) => {
+    for (const [ref, cols] of Object.entries(schemas || {})) if (cols && cols.length) carried[ref] = cols;
+  };
+
+  for (let i = 0; i < ordered.length; i++) {
+    const a = ordered[i];
+    setStatus(status, `Running ${i + 1}/${ordered.length}: ${activityLabel(a.name)}…`);
+    if (!a.notebook_id) {
+      // A Copy (or any non-notebook activity) contributes only the lineage it
+      // declares inline — nothing to execute, no JVM needed.
+      addSet(combined.reads, a.reads || []);
+      addSet(combined.writes, a.writes || []);
+      combined.column_lineage.push(...(a.column_lineage || []));
+      for (const flow of a.column_lineage || []) {
+        if (flow.from_table) (combined.table_schemas[flow.from_table] ??= []).push({ name: flow.from_column });
+        (combined.table_schemas[flow.to_table] ??= []).push({ name: flow.to_column });
+      }
+      carry(combined.table_schemas);
+      combined.log.push(`[definition] ${activityLabel(a.name)} — lineage read from the pipeline definition.`);
+      continue;
+    }
+    try {
+      const ws = a.workspace_id || workspaceId;
+      const { cells } = await api(`/fabric/workspaces/${ws}/items/${a.notebook_id}/notebook-source`);
+      const result = await api('/sandbox/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: activityLabel(a.name), cells, carried_schemas: carried }),
+      });
+      carry(result.table_schemas);
+      addSet(combined.reads, result.reads || []);
+      addSet(combined.writes, result.writes || []);
+      combined.column_lineage.push(...(result.column_lineage || []));
+      for (const [ref, cols] of Object.entries(result.table_schemas || {})) combined.table_schemas[ref] = cols;
+      combined.log.push(...(result.log || []));
+      if (!result.ok) combined.ok = false;
+    } catch (e) {
+      combined.ok = false;
+      combined.log.push(`${activityLabel(a.name)} failed: ${e.message}`);
+    }
+  }
+
+  lastRunResult = combined;
+  document.getElementById('results-output').textContent = JSON.stringify(combined, null, 2);
+  document.getElementById('results-fieldset').disabled = false;
+  document.getElementById('push-fieldset').disabled = !combined.ok;
+  document.querySelector('[data-tab="sandbox"]').click();
+  setStatus(status, combined.ok ? 'Pipeline run complete.' : 'Pipeline run finished with errors — see log.', combined.ok ? 'ok' : 'error');
+});
+
+document.getElementById('btn-send-to-sandbox').addEventListener('click', async () => {
+  const status = document.getElementById('explore-status');
+  if (!selectedWorkspace || !selectedNotebook) return;
+  try {
+    const { cells } = await api(
+      `/fabric/workspaces/${selectedWorkspace.id}/items/${selectedNotebook.id}/notebook-source`
+    );
+    document.getElementById('cells-input').value = cells.join('\n\n# --- cell ---\n\n');
+    document.getElementById('sandbox-workspace').value = selectedWorkspace.name;
+    document.querySelector('[data-tab="sandbox"]').click();
+    setStatus(status, 'Sent to Sandbox.', 'ok');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+});
+
+// --- sandbox ---
+document.getElementById('btn-run-sandbox').addEventListener('click', async () => {
+  const status = document.getElementById('sandbox-status');
+  const raw = document.getElementById('cells-input').value;
+  const cells = raw.split(/\n\s*#\s*---\s*cell\s*---\s*\n/i).map((c) => c.trim()).filter(Boolean);
+  if (!cells.length) {
+    setStatus(status, 'Enter at least one cell.', 'error');
+    return;
+  }
+  setStatus(status, 'Running…');
+  try {
+    const result = await api('/sandbox/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'sandbox',
+        cells,
+        workspace: document.getElementById('sandbox-workspace').value,
+        lakehouse: document.getElementById('sandbox-lakehouse').value,
+      }),
+    });
+    lastRunResult = result;
+    document.getElementById('results-output').textContent = JSON.stringify(result, null, 2);
+    document.getElementById('results-fieldset').disabled = false;
+    document.getElementById('push-fieldset').disabled = !result.ok;
+    setStatus(status, result.ok ? `Done — engine: ${result.engine}` : `Run failed: ${result.error}`, result.ok ? 'ok' : 'error');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+});
+
+// --- solidatus push ---
+api('/config').then((cfg) => {
+  if (cfg.solidatusBaseUrl) document.getElementById('solidatus-base-url').value = cfg.solidatusBaseUrl;
+}).catch(() => {});
+
+document.getElementById('btn-push-solidatus').addEventListener('click', async () => {
+  const status = document.getElementById('push-status');
+  if (!lastRunResult) {
+    setStatus(status, 'Run the sandbox first.', 'error');
+    return;
+  }
+  const base_url = document.getElementById('solidatus-base-url').value.trim();
+  const token = document.getElementById('solidatus-token').value.trim();
+  const mode = document.querySelector('input[name="solidatus-mode"]:checked').value;
+  if (!base_url || !token) {
+    setStatus(status, 'Base URL and token are required.', 'error');
+    return;
+  }
+  setStatus(status, 'Pushing…');
+  try {
+    let result;
+    if (mode === 'create') {
+      const name = document.getElementById('solidatus-model-name').value.trim();
+      if (!name) { setStatus(status, 'Enter a model name.', 'error'); return; }
+      result = await api('/solidatus/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base_url, token, name, run_result: lastRunResult }),
+      });
+    } else {
+      const model_id = document.getElementById('solidatus-model-id').value.trim();
+      if (!model_id) { setStatus(status, 'Enter the existing model id.', 'error'); return; }
+      result = await api('/solidatus/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base_url, token, model_id, run_result: lastRunResult }),
+      });
+    }
+    setStatus(status, `Done — model id: ${result.id}`, 'ok');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+});
+</script>
+</body>
+</html>

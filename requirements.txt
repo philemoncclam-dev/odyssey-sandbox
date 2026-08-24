@@ -1,0 +1,34 @@
+# The lineage engine's dependencies. Not the application's — Odyssey's app is
+# the browser bundle under app/ and needs none of this.
+#
+# The list is short because the engine is pure: dropping router.py removed the
+# FastAPI adapter and with it fastapi, uvicorn, httpx, azure-identity,
+# anthropic, openai and psycopg.
+
+# The run request/result contract. protocol.py is the schema.
+pydantic>=2.11
+
+# Column-level lineage from SQL text, for the stub engine — the one that runs
+# without a JVM, and therefore the one CI exercises. Import-guarded in
+# _sqllineage.py: a missing sqlglot degrades the run rather than crashing it.
+#
+# The `databricks` dialect is used, not `spark` — see the note in
+# _sqllineage.py. Spark 4.x VARIANT path access (`payload:user.id`) is a parse
+# error in the latter and `analyze` degrades silently, so a table vanishes from
+# the graph with nothing said.
+sqlglot>=25.0
+
+# Tests
+pytest>=8.3
+
+# The Spark engine is NOT installed here. It needs a JVM and Python 3.12, and
+# the stub covers the same contract without one:
+#   pyspark==4.0.0
+#   openlineage-integration-common
+#   openlineage-python
+#
+# Tracks Fabric Runtime 2.0 (Spark 4.1, Delta 4.2, Python 3.13, Java 21),
+# deliberately one Spark minor behind. The sandbox only ANALYZES plans, so
+# matching the runtime exactly buys nothing on its own; it matters when a
+# notebook uses syntax the older parser rejects. Bump when a 4.1-only construct
+# actually fails a run.

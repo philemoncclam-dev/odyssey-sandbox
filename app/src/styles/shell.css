@@ -1,0 +1,437 @@
+/* ===== Shell layout (SHELL-01, SHELL-02, D-01-D-05, D-10, D-17) =====
+   Structural/layout rules for the new mode-based shell chrome. Colour,
+   spacing, and radius all flow through tokens.css / components.css's tier-3
+   block — component geometry (fixed widths, icon sizes) is the sanctioned
+   literal exception per components.css's own documented convention.
+   Overlay z-index values follow 02-UI-SPEC.md's stacking table verbatim. */
+
+.shell { height: 100vh; display: flex; overflow: hidden; position: relative; }
+
+/* ===== Full-bleed canvas, floating rail =====
+   The Model Viewer's layer band has to span the full window width, so its
+   centre is the window's centre and a layer name reads as centred over its
+   column. That means the canvas cannot be inset by an in-flow rail.
+   So on such a route the rail leaves the flow entirely and floats over the
+   canvas: detached from the top (it sits below the band), from the left, and
+   from the bottom (height is content-sized, not 100vh). The canvas then starts
+   at x=0 and layout.ts's CANVAS_PADDING_LEFT keeps the first column clear of it.
+
+   Gated on data-fullbleed, NOT data-mode="model": the Model Browser is in the
+   same mode but is an ordinary in-flow page, and a floating rail would sit on
+   top of its sidebar. See railConfig.isFullBleedPath. */
+.shell[data-fullbleed] .shell-rail-col {
+  position: absolute;
+  /* Clears the viewer's top bar AND the layer band beneath it. */
+  top: calc(var(--mv-topbar-height) + var(--mv-band-height) + var(--spacing-2));
+  left: var(--spacing-2);
+  height: auto;
+  padding: var(--spacing-2) 0;
+  border: var(--border-width) solid var(--rail-border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-raised);
+}
+
+/* ===== Rail column: rail items + rail-bottom cluster ===== */
+.shell-rail-col {
+  width: var(--rail-width);
+  flex: none;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) 0;
+  background: var(--rail-bg);
+  border-right: var(--border-width) solid var(--rail-border);
+  z-index: 5; /* rail + top-bar chrome tier, 02-UI-SPEC overlay table */
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-1);
+  margin-top: var(--spacing-2);
+}
+
+.rail-item {
+  display: grid;
+  place-items: center;
+  width: var(--rail-item-size);
+  height: var(--rail-item-size);
+  border-radius: var(--rail-item-radius);
+  color: var(--rail-item-fg);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color .15s, background-color .15s;
+}
+.rail-item svg { width: var(--rail-item-icon-size); height: var(--rail-item-icon-size); stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.rail-item:hover { color: var(--rail-item-fg-hover); background: var(--rail-item-bg-hover); }
+.rail-item.active { color: var(--rail-item-fg-active); background: var(--rail-item-bg-active); }
+
+/* Model editor rail: the same items are <button>s (actions), not <Link>s, and
+   carry an optional validation badge. Reset button chrome to match .rail-item. */
+.rail-action {
+  position: relative;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  padding: 0;
+}
+.rail-action:disabled { opacity: .4; cursor: default; }
+.rail-action:disabled:hover { color: var(--rail-item-fg); background: transparent; }
+.rail-action-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: var(--radius-pill);
+  background: var(--color-destructive);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+.rail-model .rail-sep {
+  width: 18px;
+  height: 1px;
+  margin: var(--spacing-1) 0;
+  background: var(--color-border);
+}
+
+.rail-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--rail-bottom-gap);
+  padding-top: var(--spacing-2);
+}
+
+.rail-bottom-btn {
+  display: grid;
+  place-items: center;
+  width: var(--theme-toggle-size);
+  height: var(--theme-toggle-size);
+  border: 0;
+  border-radius: var(--rail-item-radius);
+  background: transparent;
+  color: var(--rail-item-fg);
+  cursor: pointer;
+  transition: color .15s, background-color .15s;
+}
+.rail-bottom-btn:hover { color: var(--rail-item-fg-hover); background: var(--rail-item-bg-hover); }
+.rail-bottom-btn svg { width: var(--rail-item-icon-size); height: var(--rail-item-icon-size); stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+.status-dot-wrap { display: grid; place-items: center; width: var(--theme-toggle-size); height: var(--theme-toggle-size); }
+.status-dot { width: var(--status-dot-size); height: var(--status-dot-size); border-radius: 50%; background: var(--status-dot-off); }
+.status-dot-ok { background: var(--status-dot-ok); }
+.status-dot-off { background: var(--status-dot-off); }
+.status-dot-err { background: var(--status-dot-err); }
+
+/* ===== Rail tooltip (Radix Tooltip) — z-index 50, above the inspector ===== */
+.rail-tooltip {
+  background: var(--mode-menu-bg);
+  color: var(--color-text-primary);
+  border: var(--border-width) solid var(--mode-menu-border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--mode-menu-shadow);
+  padding: var(--spacing-1) var(--spacing-2);
+  font-size: var(--text-micro);
+  z-index: 50;
+}
+.rail-tooltip-arrow { fill: var(--mode-menu-bg); }
+
+/* The mode-menu rules that stood here are gone with shell/ModeMenu.tsx: the
+   mark in each screen's own top bar is the mode switch now. The
+   --mode-menu-* TOKENS stay in components.css — .rail-tooltip above shares
+   them, so they are the overlay surface's tokens, not the menu's. */
+
+/* ===== Canvas region: fills 100% of the remaining viewport (SHELL-02) ===== */
+.graph-snapshot-banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  font-size: var(--text-micro);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+  z-index: 5;
+}
+.graph-snapshot-banner strong { color: var(--color-text-primary); font-weight: 600; }
+.graph-snapshot-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  flex: 0 0 auto;
+}
+.graph-snapshot-clear {
+  margin-left: auto;
+  font: inherit;
+  font-size: var(--text-micro);
+  color: var(--color-accent);
+  background: transparent;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 2px var(--spacing-2);
+  cursor: pointer;
+}
+.graph-snapshot-clear:hover { border-color: var(--color-accent); }
+
+.shell-canvas {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative; /* Inspector overlay positions against this edge, D-10 */
+  overflow: hidden;
+}
+
+/* ===== Inspector overlay (D-10, D-12, D-13) — z-index 20, above canvas
+   content, below tooltips/menus/palette. Absolute so its presence/absence
+   never reflows the canvas beneath it. Fixed header (.inspector-head) +
+   internally-scrolling body (.inspector-body), per the "overflow" UI
+   consideration — the panel itself never grows past the viewport height. */
+.inspector-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--inspector-width);
+  background: var(--inspector-bg);
+  border-left: var(--border-width) solid var(--inspector-border);
+  box-shadow: var(--inspector-shadow);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.inspector-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4) var(--spacing-4) var(--spacing-3);
+  border-bottom: var(--border-width) solid var(--inspector-border);
+}
+.inspector-head-text { min-width: 0; }
+.inspector-kind {
+  font-size: var(--text-micro);
+  font-family: var(--font-mono);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--spacing-1);
+}
+.inspector-title {
+  margin: 0;
+  font-size: var(--text-heading);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  /* long-text consideration: a pathologically long node/column name can
+     never break the panel layout. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inspector-close {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font: inherit;
+  font-size: var(--text-heading);
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-control);
+  /* Padding + negative top/right margin gives a >=44x44px hit target (the
+     inspector-close touch-target exception, 02-UI-SPEC Spacing Scale)
+     without inflating the visible header layout — same pattern as .di-x. */
+  padding: var(--spacing-4);
+  margin: calc(-1 * var(--spacing-4)) calc(-1 * var(--spacing-4)) 0 0;
+}
+.inspector-close:hover { color: var(--color-text-primary); }
+
+.inspector-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.inspector-location { font-size: var(--text-micro); font-family: var(--font-mono); color: var(--color-text-secondary); }
+.inspector-cols { display: flex; flex-direction: column; }
+
+/* ===== Command palette (cmdk Command.Dialog) — z-index 100, topmost =====
+   cmdk's `className` prop reaches the inner [cmdk-root] Command element;
+   `overlayClassName`/`contentClassName` reach the Radix Dialog primitives
+   Command.Dialog wraps (Command.Dialog itself renders no positioning CSS,
+   so the fixed/centered layout below is this shell's own, carried-forward
+   verbatim from search.css's --palette-width/--palette-max-height values,
+   per 02-UI-SPEC.md). */
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-scrim);
+  z-index: 100;
+}
+.palette-content {
+  position: fixed;
+  top: 18vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+}
+.palette {
+  width: var(--palette-width);
+  max-height: var(--palette-max-height);
+  background: var(--palette-bg);
+  border: var(--border-width) solid var(--palette-border);
+  border-radius: var(--mode-menu-radius);
+  box-shadow: var(--palette-shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Palette input/results/rows — carried forward verbatim from the
+   retired views/search.css (D-17); only the container (.palette/.palette-
+   overlay/.palette-content above) is new, the row/highlight treatment
+   underneath is unchanged. */
+.sp-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: 600;
+  padding: var(--spacing-3) var(--spacing-4);
+  border-bottom: var(--border-width) solid var(--palette-border);
+}
+
+.sp-input::placeholder { color: var(--color-text-tertiary); }
+
+.sp-results {
+  overflow-y: auto;
+  padding: var(--spacing-1) 0 var(--spacing-2);
+}
+
+.sp-empty {
+  padding: var(--spacing-3) var(--spacing-4);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+}
+
+[cmdk-group-heading] {
+  padding: var(--spacing-2) var(--spacing-4) var(--spacing-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.sp-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1) var(--spacing-4);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.sp-row[data-selected='true'] {
+  background: var(--color-accent-dim);
+}
+
+.sp-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.sp-ctx {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-line {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  color: var(--color-text-tertiary);
+}
+
+.sp-code {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.sp-row mark {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+  border-radius: var(--radius-input);
+  padding: 0;
+}
+
+/* ===== Model-editor rail overflow ("More tools") =====
+   Reuses the mode menu's surface so the two popovers in the rail column read
+   as one component; the rows differ only by carrying the action's rail glyph
+   so the icon a user has half-learned still maps to the label. */
+.rail-more-item { user-select: none; }
+.rail-more-item[data-disabled] { opacity: .4; pointer-events: none; }
+.rail-more-icon { display: grid; place-items: center; width: 16px; height: 16px; flex: none; }
+.rail-more-icon svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.rail-more-sep { height: 1px; margin: var(--spacing-1) 0; background: var(--color-border); }
+
+/* Identity in the rail bottom. The signed-out state is deliberately the
+   attention-getting one: on the service-principal fallback, Explore lists a
+   shared robot account's workspaces, and a user who reads them as their own
+   access is drawing conclusions from somebody else's permissions. */
+.rail-identity {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  color: #475467;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.rail-identity[data-signed-in='true'] {
+  border-color: #b6c9ec;
+  background: #eaf0fb;
+  color: #2f5fc0;
+}
+.rail-identity[data-signed-in='false'] {
+  border-color: #e4c07a;
+  background: #fdf6e7;
+  color: #8a6116;
+}
+.rail-identity:hover {
+  filter: brightness(0.97);
+}

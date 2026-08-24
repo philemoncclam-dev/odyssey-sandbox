@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- The app mark as the tab icon: the same cube as `shell/Logo.tsx`, bare,
+       the way it appears beside "Models" in the Model Browser header.
+
+       NOTE FOR EDITORS: no double hyphen may appear anywhere in this comment.
+       A favicon is served as image/svg+xml and parsed as strict XML, where a
+       double hyphen inside a comment is a fatal error and the browser drops
+       the whole file for a broken-image glyph. Referring to a CSS custom
+       property by its literal name is therefore not possible here, which is
+       why the tokens below are described in words rather than written out.
+
+       Two deliberate differences from the in-app mark, both forced by the tab
+       strip being a surface we do not control:
+
+       1. The colour is switched HERE rather than inherited. In the app the
+          mark is `stroke: currentColor` and picks up the page's text colour.
+          A favicon gets no page and no stylesheet, so it would render as one
+          fixed colour and disappear against a tab strip of that same shade,
+          a dark cube on dark chrome. The media query below is the smallest
+          thing that keeps it visible in both, and it is why this file is not
+          simply the Logo.tsx path copied across.
+       2. The stroke is heavier (2.6 against 1.8, before the group's scale).
+          At 16px a 1.8 stroke on a 24 grid falls under one device pixel and
+          greys out into a smudge.
+
+       The two colours are the resolved light and dark values of the app's
+       primary text token (slate 8, in tokens.css). They are literals because
+       there is no stylesheet here to read a custom property from, so if that
+       token changes, this file has to change with it. -->
+  <style>
+    .mark { stroke: #232a3a; }
+    @media (prefers-color-scheme: dark) {
+      .mark { stroke: #eff0f4; }
+    }
+  </style>
+  <g
+    class="mark"
+    transform="translate(12 12) scale(0.92) translate(-12 -13)"
+    fill="none"
+    stroke-width="2.6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M4 17V9l8-5 8 5v8l-8 5-8-5Z" />
+    <path d="M4 9l8 5 8-5M12 14v8" />
+  </g>
+</svg>
